@@ -3,79 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>My English Journey — Menuju Fluent & IELTS</title>
-<meta name="description" content="Kurikulum belajar English step-by-step dari A1 sampai C1 dan persiapan IELTS, memakai sumber gratis dan open-source.">
-<link rel="stylesheet" href="assets/style.css">
+<title>My English Journey</title>
+<meta name="description" content="Platform coaching belajar English A1 → C1 dan persiapan IELTS: rencana harian, Speaking Lab dengan rekaman & penilaian, Writing Lab, progress tracker, dan library sumber resmi/open-source.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-<header class="hero">
-  <div class="wrap">
-    <p class="eyebrow">Roadmap A1 → C1 · IELTS</p>
-    <h1>My English Journey</h1>
-    <p class="lead">Kurikulum step-by-step menuju fluent, dengan sumber belajar gratis &amp; open-source, ditutup dengan tes IELTS.</p>
-    <div class="progress-card">
-      <div class="progress-top"><span>Progress total</span><strong id="totalPct">0%</strong></div>
-      <div class="bar"><div id="totalBar"></div></div>
-      <div class="progress-sub" id="totalSub"></div>
-    </div>
+<header class="top">
+  <div class="wrap row between">
+    <a href="#/" class="brand">🧭 My English Journey</a>
+    <span class="small muted hide-sm">A1 → C1 · IELTS</span>
   </div>
+  <nav id="nav" class="wrap nav"></nav>
 </header>
-
-<nav class="nav" id="nav"><div class="wrap"></div></nav>
-
-<main class="wrap">
-  <section id="target" class="card">
-    <h2>🎯 Target saya</h2>
-    <div class="grid2">
-      <label>Target band IELTS
-        <select id="targetBand"></select>
-      </label>
-      <label>Tanggal tes IELTS
-        <input type="date" id="testDate">
-      </label>
-      <label>Jam belajar per hari
-        <input type="number" id="hoursDay" min="0.5" max="8" step="0.5" value="1.5">
-      </label>
-      <div class="countdown" id="countdown">—</div>
-    </div>
-    <p class="muted small">Estimasi kasar: Cambridge memperkirakan ±200 jam belajar terbimbing untuk naik satu level CEFR. Tiap orang berbeda; gunakan sebagai patokan, bukan janji.</p>
-  </section>
-
-  <section id="daily" class="card">
-    <h2>⏱️ Rutinitas harian (±80 menit)</h2>
-    <ul class="daily" id="dailyList"></ul>
-    <p class="muted small">Konsisten 80 menit/hari lebih efektif dari 8 jam di akhir pekan.</p>
-  </section>
-
-  <section id="map" class="card">
-    <h2>🗺️ Peta level</h2>
-    <table class="map"><thead><tr><th>CEFR</th><th>Perkiraan IELTS</th></tr></thead><tbody id="mapBody"></tbody></table>
-    <p class="muted small">Pemetaan CEFR ↔ IELTS bersifat perkiraan; lihat penjelasan resmi di ielts.org.</p>
-  </section>
-
-  <div id="phases"></div>
-
-  <section id="repos" class="card">
-    <h2>🧰 Repo GitHub open-source yang berguna</h2>
-    <ul id="repoList" class="plain"></ul>
-  </section>
-
-  <section id="log" class="card">
-    <h2>📓 Jurnal belajar</h2>
-    <textarea id="journal" rows="5" placeholder="Hari ini belajar apa? Kata baru? Tulis dalam English 😊"></textarea>
-    <div class="row"><button id="saveJournal">Simpan</button><span id="journalMsg" class="muted small"></span></div>
-    <ul id="entries" class="plain"></ul>
-    <p class="muted small">Disimpan di browser ini saja (localStorage). Untuk versi permanen, tulis di folder <code>journal/</code> di repo.</p>
-  </section>
-
-  <section class="card note">
-    <h3>Catatan sumber</h3>
-    <p class="small">Link mengarah ke halaman utama penyedia sumber agar tidak mudah rusak; gunakan fitur filter level/topik di dalamnya. Label: <span class="tag free">free</span> gratis, <span class="tag open">open</span> domain publik / lisensi terbuka, <span class="tag open-source">open-source</span> kode di GitHub, <span class="tag official">official</span> penyelenggara resmi (sebagian materi berbayar). Cek ulang jika ada link yang berubah.</p>
-  </section>
-</main>
-
-<footer><div class="wrap small">Dibuat dengan semangat belajar · <button id="reset" class="link">Reset progress</button></div></footer>
-<script src="assets/data.js"></script>
-<script src="assets/app.js"></script>
+<main id="app" class="wrap"></main>
+<footer class="wrap small muted">
+  Open-source · data tersimpan di browser kamu · sumber: BBC, British Council, Cambridge, Oxford, IELTS partners, proyek open-source.
+  <a href="https://github.com/wardwar/my-english-journey">Source di GitHub</a>
+</footer>
+<noscript><p class="wrap">Platform ini membutuhkan JavaScript.</p></noscript>
+<script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
