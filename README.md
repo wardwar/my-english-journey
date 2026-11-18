@@ -10,7 +10,7 @@ Situs statis (HTML + JavaScript, tanpa build) untuk GitHub Pages. Semua data ter
 |---|---|
 | 🏠 **Coach** | Rencana belajar hari ini (otomatis dari minggu & hari), streak, catatan coach (pengingat speaking, checkpoint, pace menuju tanggal tes, kriteria terlemah) |
 | 🗺️ **Roadmap** | 6 fase, 57 minggu (+ siklus lanjutan) terstruktur: grammar, kosakata, listening, reading, speaking, writing per minggu + checkpoint |
-| 🗣️ **Speaking Lab** | Mock IELTS Part 1–3 (timer & persiapan 1 menit), topik bebas (4-3-2), read-aloud; rekam audio, transkrip otomatis, metrik (kata/menit, jeda, filler, keragaman kata, akurasi read-aloud), self-rating 4 kriteria, riwayat & grafik |
+| 🗣️ **Speaking Lab** | Mock IELTS Part 1–3 (timer & persiapan 1 menit), topik bebas (4-3-2), read-aloud; rekam audio, transkrip otomatis, metrik (kata/menit, jeda, filler, keragaman kata, akurasi read-aloud), self-rating 4 kriteria, riwayat & grafik. Read-aloud: klik kata (merah) → IPA, rekaman manusia UK/US (Wikimedia Commons), suara browser normal/lambat, latihan rekam ulang dicek Whisper |
 | ✍️ **Writing Lab** | Soal Task 2 & GT letter, timer, word count, checklist, link feedback gratis, self-rating |
 | 📈 **Progress** | Catat EF SET / mock / IELTS resmi (overall dibulatkan seperti IELTS), grafik vs target |
 | 📚 **Library** | 49 sumber resmi / open / open-source dengan filter skill & label |

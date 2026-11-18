@@ -93,7 +93,7 @@ table.map { border-collapse: collapse; width: 100%; font-size: .92rem; }
 .alert { padding: 10px 14px; border-radius: 10px; background: #fef3c7; color: #7a4a00; font-size: .9rem; }
 .prompt { margin: 10px 0; } .prompt ol { padding-left: 22px; } .prompt li { margin: 4px 0; }
 .big { font-size: 1.2rem; font-weight: 600; } .read { line-height: 1.9; }
-.read .ok { color: var(--ok); } .read .miss { color: var(--danger); font-weight: 700; text-decoration: underline wavy; }
+
 .cue { border: 2px dashed var(--line); border-radius: 12px; padding: 12px 16px; }
 .cue p { margin: 6px 0 2px; color: var(--muted); }
 .rec-bar { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
@@ -140,3 +140,15 @@ audio { width: 100%; margin: 6px 0; }
 }
 .howto summary { cursor: pointer; } .howto ol { padding-left: 20px; margin: 8px 0 0; } .howto li { margin: 4px 0; }
 .btn:disabled { opacity: .5; cursor: wait; }
+
+/* kata yang bisa diklik & panel pengucapan */
+.w { font: inherit; color: inherit; background: none; border: 0; padding: 0 1px; border-radius: 4px; cursor: pointer; line-height: inherit; }
+.w:hover, .w.sel { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.w.ok { color: var(--ok); }
+.w.miss { color: var(--danger); font-weight: 700; text-decoration: underline wavy; text-underline-offset: 3px; }
+.w.chip { border: 1px solid var(--danger); padding: 1px 9px; border-radius: 99px; text-decoration: none; margin: 2px 0; }
+.pbox { margin-top: 10px; }
+.pron { border: 2px solid var(--accent); border-radius: 12px; padding: 12px 14px; background: var(--card); }
+.pron .pw { font-size: 1.3rem; } .pron .ipa { font-family: "Charis SIL", "Doulos SIL", "Lucida Sans Unicode", system-ui, sans-serif; margin-left: 6px; }
+.pron .row { margin-top: 8px; }
+.practice { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }

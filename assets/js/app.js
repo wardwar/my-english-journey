@@ -2,6 +2,7 @@ import { PHASES, DAY_TEMPLATE } from "./data/curriculum.js";
 import { RESOURCES, byId } from "./data/resources.js";
 import { PART1, PART2, READ_ALOUD, SPEAKING_RUBRIC, WRITING_PROMPTS, WRITING_CHECK } from "./data/banks.js";
 import { Session, canRecord, canTranscribe, metrics, indicative, readAloudScore, ieltsRound, tokenize, whisperTranscribe } from "./speech.js";
+import { openPanel, clickableText, speak, sentenceOf } from "./pronounce.js";
 import { S, update, save, exportJSON, importJSON, resetAll, audioPut, audioGet, audioDel, today, uid } from "./store.js";
 
 // ---------- helpers
@@ -278,7 +279,7 @@ function setupRead(lab) {
   <p class="small muted">Baca keras-keras dengan jelas & natural. Mesin speech-recognition mengecek kata mana yang <b>tidak terdengar jelas</b>. Ini proxy kejelasan pengucapan, bukan penilaian aksen.</p></div><div id="lab2"></div>`;
   const go = () => {
     const lv = $("#lvl", lab).value, t = pick(READ_ALOUD.filter((x) => x.level === lv));
-    runLab($("#lab2", lab), { mode: "read", title: `Read-aloud ${lv}`, target: t.text, steps: [{ label: "Baca teks ini", html: `<p class="big read">${esc(t.text)}</p>` }], reroll: go });
+    runLab($("#lab2", lab), { mode: "read", title: `Read-aloud ${lv}`, target: t.text, steps: [{ label: "Baca teks ini", html: `<p class="small muted">💡 Ragu cara baca suatu kata? Klik katanya untuk mendengar contoh pengucapan sebelum merekam.</p><p class="big read">${clickableText(t.text)}</p><div class="pbox" hidden></div>` }], reroll: go });
   };
   $("#lvl", lab).onchange = go;
   go();
@@ -379,8 +380,7 @@ function showResult(el, cfg, r) {
     if (cfg.target) {
       const s = readAloudScore(cfg.target, tr);
       m.accuracy = s.accuracy;
-      ra = `<div class="card inset"><b>Kejelasan read-aloud: ${s.accuracy}%</b><p class="read">${s.words.map((w, i) => `<span class="${s.hit[i] ? "ok" : "miss"}">${esc(w)}</span>`).join(" ")}</p>
-      <p class="small muted">Kata merah = tidak dikenali mesin. Cek pengucapannya di ${resLink("camdict")}${resLink("youglish")}</p></div>`;
+      ra = readAloudBlock(cfg.target, s);
     }
     if (!m.words) { $("#met", el).innerHTML = `<p class="alert">Belum ada transkrip, jadi metrik belum bisa dihitung. Tunggu Whisper selesai, atau ketik transkrip lalu klik “Hitung ulang”.</p>`; return; }
     $("#met", el).innerHTML = `<div class="metrics">
@@ -424,10 +424,19 @@ function showResult(el, cfg, r) {
       calc();
       const id = uid();
       await audioPut(id, r.blob);
-      update((s) => s.speaking.push({ id, date: new Date().toISOString(), mode: cfg.mode, title: cfg.title, transcript: $("#tr", el).value, metrics: m, ratings: ratings(), overall: ovr(), notes: $("#notes", el).value }));
+      update((s) => s.speaking.push({ id, date: new Date().toISOString(), mode: cfg.mode, title: cfg.title, target: cfg.target || null, transcript: $("#tr", el).value, metrics: m, ratings: ratings(), overall: ovr(), notes: $("#notes", el).value }));
       location.hash = "#/speaking/history";
     }
   };
+}
+
+function readAloudBlock(target, s) {
+  const missed = [...new Map(s.words.map((w, i) => [w, i]).filter(([, i]) => !s.hit[i]).reverse()).entries()].reverse();
+  return `<div class="card inset"><div class="row between"><b>Kejelasan read-aloud: ${s.accuracy}%</b><button class="btn ghost sm" data-say="${esc(target)}">🔊 Dengar teks lengkap</button></div>
+    <p class="read">${clickableText(target, s.hit)}</p>
+    ${missed.length ? `<p class="small"><b>Kata yang perlu dilatih:</b> ${missed.map(([w, i]) => `<button type="button" class="w miss chip" data-word="${esc(w)}" data-sent="${esc(sentenceOf(target, i))}">${esc(w)}</button>`).join(" ")}</p>` : `<p class="small">🎉 Semua kata dikenali.</p>`}
+    <p class="small muted">👆 Klik kata (terutama yang <span class="w miss">merah</span>) untuk mendengar pengucapan yang benar, melihat IPA, dan latihan rekam ulang.</p>
+    <div class="pbox" hidden></div></div>`;
 }
 
 function speakingHistory() {
@@ -445,7 +454,7 @@ function speakingHistory() {
     <div class="row wrap"><button class="btn sm" data-play="${x.id}">▶ Putar audio</button>${!x.metrics?.words ? `<button class="btn ghost sm" data-retr="${x.id}">🎙️ Transkrip dengan Whisper</button>` : ""}<button class="btn ghost sm" data-del="${x.id}">Hapus</button></div><div id="a-${x.id}"></div>
     ${x.ratings ? `<p class="small">${Object.entries(x.ratings).map(([k, v]) => `${SPEAKING_RUBRIC[k].name}: <b>${v ?? "—"}</b>`).join(" · ")}</p>` : ""}
     ${x.notes ? `<p class="small"><b>Catatan:</b> ${esc(x.notes)}</p>` : ""}
-    <p class="small muted">${esc(x.transcript)}</p></details>`).join("")}`;
+    ${x.target && x.transcript ? readAloudBlock(x.target, readAloudScore(x.target, x.transcript)) : `<p class="small muted">${esc(x.transcript)}</p>`}</details>`).join("")}`;
 }
 function bindHistory(root) {
   root.onclick = async (e) => {
@@ -706,6 +715,17 @@ function lineChart(series, { min, max, target, targetLabel, bands = [] }) {
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img"><text x="2" y="${Y(max) + 4}" class="lbl">${max}</text><text x="2" y="${Y(min)}" class="lbl">${min}</text>${grid}${tgt}${lines}</svg>
     <div class="legend small">${series.map((s) => `<span><i style="background:${s.color}"></i>${s.name}</span>`).join("")}</div>`;
 }
+
+// ---------- klik kata → panel pengucapan (berlaku di semua halaman)
+document.addEventListener("click", (e) => {
+  const say = e.target.closest("[data-say]");
+  if (say) { speak(say.dataset.say, { rate: 0.85, lang: S().settings.lang }); return; }
+  const b = e.target.closest("button.w"); if (!b) return;
+  const box = b.closest(".card, .lab, .prompt")?.querySelector(".pbox") || document.querySelector(".pbox");
+  if (!box) return;
+  $$(".w.sel").forEach((x) => x.classList.toggle("sel", false)); b.classList.add("sel");
+  openPanel(box, { word: b.dataset.word, sentence: b.dataset.sent, lang: S().settings.lang, whisperModel: S().settings.whisper });
+});
 
 // ---------- router
 const NAV = [["", "🏠", "Coach"], ["roadmap", "🗺️", "Roadmap"], ["speaking", "🗣️", "Speaking"], ["writing", "✍️", "Writing"], ["progress", "📈", "Progress"], ["library", "📚", "Library"], ["settings", "⚙️", "Pengaturan"]];
