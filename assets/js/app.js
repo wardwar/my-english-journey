@@ -1,7 +1,7 @@
 import { PHASES, DAY_TEMPLATE } from "./data/curriculum.js";
 import { RESOURCES, byId } from "./data/resources.js";
 import { PART1, PART2, READ_ALOUD, SPEAKING_RUBRIC, WRITING_PROMPTS, WRITING_CHECK } from "./data/banks.js";
-import { Session, canRecord, canTranscribe, metrics, indicative, readAloudScore, ieltsRound, tokenize } from "./speech.js";
+import { Session, canRecord, canTranscribe, metrics, indicative, readAloudScore, ieltsRound, tokenize, whisperTranscribe } from "./speech.js";
 import { S, update, save, exportJSON, importJSON, resetAll, audioPut, audioGet, audioDel, today, uid } from "./store.js";
 
 // ---------- helpers
@@ -226,12 +226,19 @@ let speakSession = null;
 VIEWS.speaking = (sub = "mock", q = {}) => {
   const tabs = `<nav class="tabs">${SPEAK_TABS.map(([k, l]) => `<a href="#/speaking/${k}" class="${sub === k ? "active" : ""}">${l}</a>`).join("")}</nav>`;
   const warn = !canRecord ? `<p class="alert">Browser ini tidak mendukung rekaman. Pakai Chrome/Edge versi terbaru.</p>`
-    : !canTranscribe ? `<p class="alert">Transkrip otomatis butuh Chrome atau Edge. Kamu tetap bisa merekam & menempel transkrip manual (mis. dari Whisper).</p>` : "";
+    : "";
+  const howto = `<details class="card howto" ${S().speaking.length ? "" : "open"}><summary><b>❓ Cara pakai Speaking Lab</b></summary><ol class="small">
+    <li>Pilih mode: <b>Mock IELTS</b> (latihan format tes), <b>Topik bebas</b> (latihan harian), atau <b>Read-aloud</b> (cek pengucapan).</li>
+    <li>Klik <b>● Mulai rekam</b> → izinkan mikrofon → bicara. Di Mock, klik <b>Lanjut ›</b> untuk pindah Part (Part 2 ada 1 menit persiapan).</li>
+    <li>Klik <b>■ Selesai</b>. Rekaman otomatis ditranskrip — kalau transkrip live kosong, platform menjalankan <b>Whisper di browser</b> (unduh model ±80 MB sekali saja, lalu tersimpan).</li>
+    <li>Lihat metrik, dengarkan audionya, lalu <b>nilai 4 kriteria</b> dan tulis catatan error. Klik <b>💾 Simpan</b>.</li>
+    <li>Lihat perkembangan di tab <b>Riwayat</b>. Penjelasan metode penilaian di tab <b>Cara menilai speaking</b>.</li></ol>
+    <p class="small muted">Transkrip live (saat merekam) hanya ada di Chrome/Edge desktop & butuh internet. Whisper berjalan di semua browser modern.</p></details>`;
   let body = "";
   if (sub === "guide") body = speakingGuide();
   else if (sub === "history") body = speakingHistory();
   else body = `<div id="lab"></div>`;
-  return `<h1>🗣️ Speaking Lab</h1>${tabs}${sub !== "guide" && sub !== "history" ? warn : ""}${body}`;
+  return `<h1>🗣️ Speaking Lab</h1>${tabs}${sub !== "guide" && sub !== "history" ? warn + howto : ""}${body}`;
 };
 VIEWS.speaking.bind = (root, sub = "mock", q = {}) => {
   if (sub === "history") return bindHistory(root);
@@ -291,7 +298,7 @@ function runLab(el, cfg) {
         <button class="btn danger" id="stop" hidden>■ Selesai</button>
         ${cfg.reroll ? `<button class="btn ghost sm" id="reroll">🎲 Ganti soal</button>` : ""}
       </div>
-      <div class="live ${canTranscribe ? "" : "hide"}"><span class="small muted">Transkrip live:</span><p id="live">…</p></div>
+      <div class="live"><span class="small muted">Transkrip live: <b id="srst">${canTranscribe ? "menunggu rekaman" : "tidak didukung browser ini → Whisper akan dipakai setelah selesai"}</b></span><p id="live">…</p></div>
     </div>`;
   };
   draw();
@@ -308,12 +315,15 @@ function runLab(el, cfg) {
     if (id === "reroll") cfg.reroll();
     if (id === "start") {
       try {
-        speakSession = new Session({ lang: S().settings.lang, onTranscript: (t) => { const l = $("#live", el); if (l) l.textContent = t.slice(-400); }, onLevel: (v) => { const b = $("#lvlbar", el); if (b) b.style.width = v * 100 + "%"; } });
+        speakSession = new Session({ lang: S().settings.lang, onTranscript: (t) => { const l = $("#live", el); if (l) l.textContent = t.slice(-400); }, onLevel: (v) => { const b = $("#lvlbar", el); if (b) b.style.width = v * 100 + "%"; },
+          onStatus: (st, err) => { const x = $("#srst", el); if (x) x.textContent = st === "on" ? "aktif ✔" : st === "error" ? `error (${err}) → Whisper akan dipakai setelah selesai` : "tidak tersedia → Whisper akan dipakai setelah selesai"; } });
         await speakSession.start();
       } catch (err) { alert("Mikrofon tidak bisa diakses: " + err.message); speakSession = null; return; }
       $("#start", el).hidden = true; $("#stop", el).hidden = false; $("#next", el).hidden = cfg.steps.length < 2;
       const rr = $("#reroll", el); if (rr) rr.hidden = true;
       t0 = Date.now(); updateStepUI();
+      const srst = $("#srst", el);
+      if (srst && canTranscribe) { srst.textContent = "menghubungkan…"; setTimeout(() => { if (srst.isConnected && srst.textContent === "menghubungkan…") srst.textContent = "tidak merespons → Whisper akan dipakai setelah selesai"; }, 5000); }
       timer = setInterval(() => {
         const c = $("#clock", el); if (!c) return clearInterval(timer);
         if (prepLeft > 0) {
@@ -348,9 +358,10 @@ function showResult(el, cfg, r) {
     <h2>Hasil sesi</h2>
     <audio controls src="${url}"></audio>
     <p class="small muted">Dengarkan ulang sekarang <b>dan</b> besok (telinga lebih objektif setelah jeda). ${r.srError ? "Catatan transkrip: " + esc(r.srError) : ""}</p>
-    <label>Transkrip (bisa diedit / tempel hasil Whisper untuk akurasi lebih baik)
-      <textarea id="tr" rows="5">${esc(r.transcript)}</textarea></label>
-    <div class="row"><button class="btn ghost sm" id="recalc">↻ Hitung ulang metrik</button></div>
+    <label>Transkrip (bisa diedit)
+      <textarea id="tr" rows="5" placeholder="Transkrip akan muncul di sini…">${esc(r.transcript)}</textarea></label>
+    <p class="small" id="wst"></p>
+    <div class="row wrap"><button class="btn ghost sm" id="whisper">🎙️ Transkrip ulang dengan Whisper</button><button class="btn ghost sm" id="recalc">↻ Hitung ulang metrik</button></div>
     <div id="met"></div>
     <h3>Nilai dirimu (pakai band descriptors)</h3>
     <p class="small muted">Rujukan resmi: ${resLink("spkbd")} Ringkasan di bawah adalah parafrase sederhana.</p>
@@ -371,6 +382,7 @@ function showResult(el, cfg, r) {
       ra = `<div class="card inset"><b>Kejelasan read-aloud: ${s.accuracy}%</b><p class="read">${s.words.map((w, i) => `<span class="${s.hit[i] ? "ok" : "miss"}">${esc(w)}</span>`).join(" ")}</p>
       <p class="small muted">Kata merah = tidak dikenali mesin. Cek pengucapannya di ${resLink("camdict")}${resLink("youglish")}</p></div>`;
     }
+    if (!m.words) { $("#met", el).innerHTML = `<p class="alert">Belum ada transkrip, jadi metrik belum bisa dihitung. Tunggu Whisper selesai, atau ketik transkrip lalu klik “Hitung ulang”.</p>`; return; }
     $("#met", el).innerHTML = `<div class="metrics">
       ${mt("Durasi bicara", m.seconds + " dtk")}${mt("Jumlah kata", m.words)}
       ${mt("Kecepatan", m.wpm + " kata/mnt", "Natural ±120–150. <90 terasa lambat.")}
@@ -384,11 +396,29 @@ function showResult(el, cfg, r) {
   };
   const mt = (k, v, hint = "") => `<div class="metric"><span>${k}</span><b>${v}</b>${hint ? `<small>${hint}</small>` : ""}</div>`;
   calc();
+  let busy = false;
+  const runWhisper = async () => {
+    if (busy) return; busy = true;
+    const st = $("#wst", el), btn = $("#whisper", el); btn.disabled = true;
+    try {
+      const text = await whisperTranscribe(r.blob, { model: S().settings.whisper, onProgress: (k, pct, mb) => {
+        st.textContent = k === "download" ? `⬇ Mengunduh model Whisper (${mb} MB, hanya sekali)… ${pct}%` : k === "decode" ? "🔊 Membaca audio…" : "✍️ Mentranskrip… (bisa 10–60 detik)";
+      } });
+      if (!$("#tr", el)) return;
+      $("#tr", el).value = text;
+      st.textContent = text ? "✔ Transkrip Whisper selesai. Periksa & koreksi bila perlu." : "Whisper tidak menemukan ucapan. Pastikan mikrofon benar & suara terdengar di audio.";
+      calc();
+    } catch (err) {
+      st.textContent = "Whisper gagal: " + err.message + ". Kamu bisa mengetik transkrip manual lalu klik Hitung ulang.";
+    } finally { busy = false; btn.disabled = false; }
+  };
+  if (!r.transcript) runWhisper();
   const ratings = () => Object.fromEntries($$("[data-rate]", el).map((s) => [s.dataset.rate, s.value ? +s.value : null]));
   const ovr = () => { const v = Object.values(ratings()); return v.every((x) => x) ? ieltsRound(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   el.onchange = (e) => { if (e.target.dataset.rate) $("#ov", el).textContent = ovr() ?? "—"; };
   el.onclick = async (e) => {
     if (e.target.id === "recalc") calc();
+    if (e.target.id === "whisper") runWhisper();
     if (e.target.id === "discard" && confirm("Buang rekaman ini?")) render();
     if (e.target.id === "save") {
       calc();
@@ -412,7 +442,7 @@ function speakingHistory() {
   </div>
   ${sp.map((x) => `<details class="card hist"><summary><div class="row between"><span><b>${fmtDate(x.date)}</b> · ${esc(x.mode)} · ${esc(x.title).slice(0, 70)}</span><span class="pill">${x.overall ?? "—"}</span></div>
     <span class="small muted">${x.metrics ? `${x.metrics.wpm} wpm · ${x.metrics.pauses} jeda · MATTR ${x.metrics.mattr}${x.metrics.accuracy != null ? " · read-aloud " + x.metrics.accuracy + "%" : ""}` : ""}</span></summary>
-    <div class="row wrap"><button class="btn sm" data-play="${x.id}">▶ Putar audio</button><button class="btn ghost sm" data-del="${x.id}">Hapus</button></div><div id="a-${x.id}"></div>
+    <div class="row wrap"><button class="btn sm" data-play="${x.id}">▶ Putar audio</button>${!x.metrics?.words ? `<button class="btn ghost sm" data-retr="${x.id}">🎙️ Transkrip dengan Whisper</button>` : ""}<button class="btn ghost sm" data-del="${x.id}">Hapus</button></div><div id="a-${x.id}"></div>
     ${x.ratings ? `<p class="small">${Object.entries(x.ratings).map(([k, v]) => `${SPEAKING_RUBRIC[k].name}: <b>${v ?? "—"}</b>`).join(" · ")}</p>` : ""}
     ${x.notes ? `<p class="small"><b>Catatan:</b> ${esc(x.notes)}</p>` : ""}
     <p class="small muted">${esc(x.transcript)}</p></details>`).join("")}`;
@@ -421,6 +451,17 @@ function bindHistory(root) {
   root.onclick = async (e) => {
     const p = e.target.dataset.play, d = e.target.dataset.del;
     if (p) { const b = await audioGet(p); $("#a-" + p, root).innerHTML = b ? `<audio controls autoplay src="${URL.createObjectURL(b)}"></audio>` : `<p class="small muted">Audio tidak ada di browser ini.</p>`; }
+    const rt = e.target.dataset.retr;
+    if (rt) {
+      const blob = await audioGet(rt), box = $("#a-" + rt, root);
+      if (!blob) { box.innerHTML = `<p class="small muted">Audio tidak ada di browser ini.</p>`; return; }
+      e.target.disabled = true;
+      try {
+        const text = await whisperTranscribe(blob, { model: S().settings.whisper, onProgress: (k, pct, mb) => (box.innerHTML = `<p class="small">${k === "download" ? `⬇ Mengunduh model (${mb} MB, sekali saja)… ${pct}%` : "✍️ Mentranskrip…"}</p>`) });
+        update((s) => { const x = s.speaking.find((y) => y.id === rt); const old = x.metrics || {}; x.transcript = text; x.metrics = { ...metrics({ transcript: text, seconds: old.seconds || 0, pauses: new Array(old.pauses || 0).fill(0) }), longestPause: old.longestPause || 0 }; });
+        render();
+      } catch (err) { box.innerHTML = `<p class="small">Whisper gagal: ${esc(err.message)}</p>`; e.target.disabled = false; }
+    }
     if (d && confirm("Hapus sesi ini?")) { await audioDel(d); update((s) => (s.speaking = s.speaking.filter((x) => x.id !== d))); render(); }
   };
 }
@@ -626,7 +667,8 @@ VIEWS.settings = () => {
     <label>Rencana tanggal tes IELTS<input type="date" id="testDate" value="${esc(s.testDate)}"></label>
     <label>Menit belajar per hari<input type="number" id="minutes" min="20" max="300" step="10" value="${s.minutes}"></label>
     <label>Modul IELTS<select id="module"><option value="academic" ${s.module === "academic" ? "selected" : ""}>Academic</option><option value="gt" ${s.module === "gt" ? "selected" : ""}>General Training</option></select></label>
-    <label>Aksen transkrip<select id="lang"><option value="en-GB" ${s.lang === "en-GB" ? "selected" : ""}>English (UK)</option><option value="en-US" ${s.lang === "en-US" ? "selected" : ""}>English (US)</option><option value="en-AU" ${s.lang === "en-AU" ? "selected" : ""}>English (AU)</option></select></label>
+    <label>Model Whisper (transkrip rekaman)<select id="whisper"><option value="Xenova/whisper-base.en" ${s.whisper === "Xenova/whisper-base.en" ? "selected" : ""}>base.en — lebih akurat (±80 MB)</option><option value="Xenova/whisper-tiny.en" ${s.whisper === "Xenova/whisper-tiny.en" ? "selected" : ""}>tiny.en — lebih cepat/ringan (±40 MB)</option></select></label>
+    <label>Aksen transkrip live<select id="lang"><option value="en-GB" ${s.lang === "en-GB" ? "selected" : ""}>English (UK)</option><option value="en-US" ${s.lang === "en-US" ? "selected" : ""}>English (US)</option><option value="en-AU" ${s.lang === "en-AU" ? "selected" : ""}>English (AU)</option></select></label>
   </div><p class="small muted">Tersimpan otomatis.</p></div>
   <div class="card"><h2>Backup data</h2>
     <p class="small">Progress disimpan di browser ini. Export rutin (mis. tiap minggu) dan simpan file JSON-nya — bisa juga di-commit ke folder <code>journal/</code> repo kamu. Audio tidak ikut di-export (download manual dari Speaking Lab).</p>

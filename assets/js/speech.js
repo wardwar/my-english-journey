@@ -6,8 +6,8 @@ export const canTranscribe = !!SR;
 export const canRecord = !!(navigator.mediaDevices && window.MediaRecorder);
 
 export class Session {
-  constructor({ lang = "en-GB", onTranscript = () => {}, onLevel = () => {} } = {}) {
-    this.lang = lang; this.onTranscript = onTranscript; this.onLevel = onLevel;
+  constructor({ lang = "en-GB", onTranscript = () => {}, onLevel = () => {}, onStatus = () => {} } = {}) {
+    this.lang = lang; this.onTranscript = onTranscript; this.onLevel = onLevel; this.onStatus = onStatus;
     this.finalText = ""; this.interim = ""; this.confidences = [];
     this.chunks = []; this.pauses = []; this.paused = false;
     this.activeMs = 0; this.silentRun = 0; this.spokeOnce = false;
@@ -59,11 +59,12 @@ export class Session {
         this.interim = interim;
         this.onTranscript(this.finalText + interim);
       };
-      this.rec.onerror = (e) => { this.srError = e.error; };
+      this.rec.onstart = () => this.onStatus("on");
+      this.rec.onerror = (e) => { this.srError = e.error; this.onStatus("error", e.error); };
       this.rec.onend = () => { if (this.running) try { this.rec.start(); } catch {} };
       this.running = true;
-      try { this.rec.start(); } catch {}
-    }
+      try { this.rec.start(); } catch (e) { this.srError = e.message; this.onStatus("error", e.message); }
+    } else this.onStatus("none");
   }
 
   pause(v) { this.paused = v; if (v) this.silentRun = 0; }
@@ -163,3 +164,38 @@ export function readAloudScore(target, said) {
 
 // IELTS overall: rata-rata dibulatkan ke 0.5 terdekat (.25 → naik .5, .75 → naik 1)
 export const ieltsRound = (x) => Math.round(x * 2) / 2;
+
+// ---- Whisper di browser (open-source, via transformers.js). Model diunduh sekali lalu di-cache browser.
+const TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/+esm";
+const asrCache = {};
+export async function whisperTranscribe(blob, { model = "Xenova/whisper-base.en", onProgress = () => {} } = {}) {
+  if (!asrCache[model]) {
+    asrCache[model] = (async () => {
+      const { pipeline } = await import(TRANSFORMERS);
+      const files = {};
+      return pipeline("automatic-speech-recognition", model, {
+        progress_callback: (p) => {
+          if (p.status === "progress" && p.total) {
+            files[p.file] = [p.loaded, p.total];
+            const v = Object.values(files), loaded = v.reduce((a, x) => a + x[0], 0), total = v.reduce((a, x) => a + x[1], 0);
+            onProgress("download", Math.round((loaded / total) * 100), Math.round(total / 1e6));
+          }
+        }
+      });
+    })();
+    asrCache[model].catch(() => delete asrCache[model]);
+  }
+  const asr = await asrCache[model];
+  onProgress("decode");
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ac = new AC({ sampleRate: 16000 });
+  const buf = await ac.decodeAudioData(await blob.arrayBuffer());
+  ac.close();
+  let audio = buf.getChannelData(0);
+  if (buf.numberOfChannels > 1) {
+    const b = buf.getChannelData(1); audio = audio.map((v, i) => (v + b[i]) / 2);
+  }
+  onProgress("transcribe");
+  const out = await asr(audio, { chunk_length_s: 30, stride_length_s: 5 });
+  return (Array.isArray(out) ? out.map((o) => o.text).join(" ") : out.text).trim();
+}

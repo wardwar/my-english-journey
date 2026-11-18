@@ -1,7 +1,7 @@
 // Penyimpanan: state di localStorage, audio rekaman di IndexedDB. Bisa di-export/import JSON.
 const KEY = "mej.v2";
 const DEFAULT = {
-  settings: { start: "", band: 7, testDate: "", minutes: 80, module: "academic", lang: "en-GB", name: "" },
+  settings: { start: "", band: 7, testDate: "", minutes: 80, module: "academic", lang: "en-GB", name: "", whisper: "Xenova/whisper-base.en" },
   weeks: {},      // "p1-3": "done" | "skip"
   daily: {},      // "2026-11-18": { 0: true, 2: true }
   speaking: [],   // sesi speaking
